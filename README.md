@@ -1,14 +1,15 @@
 # AI-Generated GitHub Pages
 
-This repository demonstrates automated content generation and deployment to GitHub Pages using Anthropic's Claude API.
+This repository demonstrates automated content generation and deployment to GitHub Pages using AI APIs (Anthropic Claude or OpenAI GPT).
 
 ## Features
 
-- 🤖 Automated HTML content generation using Claude API
+- 🤖 Automated HTML content generation using Claude or GPT-4 APIs
 - 🚀 Automatic deployment to GitHub Pages
 - 📅 Scheduled weekly updates (configurable)
 - 🎨 Professional, responsive HTML template
-- 🔧 Manual trigger with custom prompts
+- 🔧 Manual trigger with custom prompts and AI provider selection
+- 🔄 Support for both Anthropic Claude and OpenAI GPT models
 
 ## Setup
 
@@ -17,11 +18,13 @@ This repository demonstrates automated content generation and deployment to GitH
 1. Go to Settings → Pages
 2. Under "Source", select "GitHub Actions"
 
-### 2. Add API Key
+### 2. Add API Keys
 
 1. Go to Settings → Secrets and variables → Actions
-2. Add a new repository secret named `ANTHROPIC_API_KEY`
-3. Set the value to your Anthropic API key
+2. Add one or both of the following secrets:
+   - `ANTHROPIC_API_KEY` - Your Anthropic API key (for Claude)
+   - `OPENAI_API_KEY` - Your OpenAI API key (for GPT-4)
+3. You only need to add the key for the provider you plan to use
 
 ### 3. Trigger the Workflow
 
@@ -35,6 +38,7 @@ The workflow can be triggered in three ways:
 
 When manually triggering the workflow, you can customize:
 
+- **AI Provider**: Choose between `anthropic` (Claude) or `openai` (GPT-4)
 - **Custom prompt**: The prompt for content generation
 - **Page title**: The title of the generated page
 
@@ -45,7 +49,7 @@ generate-content:
   - Checkout repository
   - Setup Python environment
   - Install dependencies
-  - Generate HTML with Claude API
+  - Generate HTML with selected AI API (Claude or GPT-4)
   - Upload as Pages artifact
 
 deploy:
@@ -61,7 +65,9 @@ To test the content generation locally:
 pip install -r requirements.txt
 
 # Set environment variables
-export ANTHROPIC_API_KEY="your-api-key"
+export AI_PROVIDER="anthropic"  # or "openai"
+export ANTHROPIC_API_KEY="your-anthropic-key"  # if using Anthropic
+export OPENAI_API_KEY="your-openai-key"  # if using OpenAI
 export PROMPT="Your custom prompt"
 export PAGE_TITLE="Your Page Title"
 

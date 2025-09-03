@@ -4,15 +4,28 @@
 
 echo "Testing AI content generation locally..."
 
-# Check if ANTHROPIC_API_KEY is set
-if [ -z "$ANTHROPIC_API_KEY" ]; then
-    echo "Warning: ANTHROPIC_API_KEY not set. Using mock mode."
-    export ANTHROPIC_API_KEY="test-key-for-validation"
+# Check which provider to use
+if [ -z "$AI_PROVIDER" ]; then
+    export AI_PROVIDER="anthropic"
+fi
+
+# Check if appropriate API key is set
+if [ "$AI_PROVIDER" = "openai" ]; then
+    if [ -z "$OPENAI_API_KEY" ]; then
+        echo "Warning: OPENAI_API_KEY not set. Using mock mode."
+        export OPENAI_API_KEY="test-key-for-validation"
+    fi
+else
+    if [ -z "$ANTHROPIC_API_KEY" ]; then
+        echo "Warning: ANTHROPIC_API_KEY not set. Using mock mode."
+        export ANTHROPIC_API_KEY="test-key-for-validation"
+    fi
 fi
 
 # Set test environment variables
 export PROMPT="Generate a sample technology article about cloud computing"
 export PAGE_TITLE="Cloud Computing Insights"
+echo "Using AI Provider: $AI_PROVIDER"
 
 # Create virtual environment
 echo "Creating virtual environment..."

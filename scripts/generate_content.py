@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate HTML content using Anthropic's Claude API and save it to GitHub Pages directory
+Generate HTML content using AI APIs (Anthropic Claude or OpenAI GPT) and save it to GitHub Pages directory
 """
 
 import os
@@ -8,7 +8,6 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
-import anthropic
 import markdown2
 from jinja2 import Template
 
@@ -138,6 +137,10 @@ def create_html_template():
             margin: 0.5rem 0.25rem;
         }
         
+        .badge.openai {
+            background: linear-gradient(135deg, #10a37f 0%, #1a7f64 100%);
+        }
+        
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
@@ -183,7 +186,7 @@ def create_html_template():
             <div class="meta">
                 <span class="badge">AI Generated</span>
                 <span class="badge">{{ date }}</span>
-                <span class="badge">Powered by Claude</span>
+                <span class="badge {{ 'openai' if provider == 'openai' else '' }}">Powered by {{ provider_name }}</span>
             </div>
         </header>
         
@@ -194,7 +197,7 @@ def create_html_template():
         </main>
         
         <footer>
-            <p>This content was automatically generated using Anthropic's Claude API</p>
+            <p>This content was automatically generated using {{ provider_name }}</p>
             <p>Last updated: {{ timestamp }}</p>
         </footer>
     </div>
@@ -203,6 +206,8 @@ def create_html_template():
 
 def generate_content_with_claude(prompt, api_key):
     """Generate content using Claude API"""
+    import anthropic
+    
     client = anthropic.Anthropic(api_key=api_key)
     
     enhanced_prompt = f"""
@@ -233,33 +238,102 @@ def generate_content_with_claude(prompt, api_key):
         )
         return message.content[0].text
     except Exception as e:
-        print(f"Error generating content: {e}", file=sys.stderr)
-        # Fallback content
-        return f"""
-        <h2>Welcome to AI Generated Content</h2>
-        <p>An error occurred while generating content. This is fallback content.</p>
-        <p>Error details: {str(e)}</p>
-        <h3>About This Page</h3>
-        <p>This page is automatically generated using GitHub Actions and the Anthropic API.</p>
-        """
+        print(f"Error generating content with Claude: {e}", file=sys.stderr)
+        raise
+
+def generate_content_with_openai(prompt, api_key):
+    """Generate content using OpenAI API"""
+    from openai import OpenAI
+    
+    client = OpenAI(api_key=api_key)
+    
+    enhanced_prompt = f"""
+    {prompt}
+    
+    Please generate rich, engaging HTML content. Use a variety of HTML elements including:
+    - Headings (h2, h3)
+    - Paragraphs
+    - Lists (ordered and unordered)
+    - Code blocks where appropriate
+    - Blockquotes for important points
+    
+    Make the content informative, well-structured, and visually appealing.
+    Return only the HTML content without the outer HTML structure.
+    """
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant that generates high-quality HTML content."
+                },
+                {
+                    "role": "user",
+                    "content": enhanced_prompt
+                }
+            ],
+            max_tokens=4000,
+            temperature=0.7
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"Error generating content with OpenAI: {e}", file=sys.stderr)
+        raise
 
 def main():
     # Get environment variables
-    api_key = os.environ.get('ANTHROPIC_API_KEY')
+    ai_provider = os.environ.get('AI_PROVIDER', 'anthropic').lower()
     prompt = os.environ.get('PROMPT', 'Generate an engaging HTML page about the latest in technology')
     page_title = os.environ.get('PAGE_TITLE', 'AI Generated Content')
     
-    if not api_key:
-        print("Error: ANTHROPIC_API_KEY not set", file=sys.stderr)
-        sys.exit(1)
+    # Determine which API to use and get the appropriate key
+    if ai_provider == 'openai':
+        api_key = os.environ.get('OPENAI_API_KEY')
+        if not api_key:
+            print("Error: OPENAI_API_KEY not set", file=sys.stderr)
+            sys.exit(1)
+        provider_name = "OpenAI GPT-4"
+        print(f"Using OpenAI API for content generation")
+    else:
+        api_key = os.environ.get('ANTHROPIC_API_KEY')
+        if not api_key:
+            print("Error: ANTHROPIC_API_KEY not set", file=sys.stderr)
+            sys.exit(1)
+        provider_name = "Claude"
+        print(f"Using Anthropic Claude API for content generation")
     
     # Create output directory
     output_dir = Path('public')
     output_dir.mkdir(exist_ok=True)
     
-    # Generate content
+    # Generate content based on provider
     print(f"Generating content with prompt: {prompt}")
-    content = generate_content_with_claude(prompt, api_key)
+    
+    try:
+        if ai_provider == 'openai':
+            # Lazy import OpenAI only when needed
+            from openai import OpenAI
+            content = generate_content_with_openai(prompt, api_key)
+        else:
+            # Lazy import Anthropic only when needed
+            import anthropic
+            content = generate_content_with_claude(prompt, api_key)
+    except ImportError as e:
+        print(f"Error: Required package not installed for {ai_provider}. Please install it first.", file=sys.stderr)
+        print(f"Details: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error generating content: {e}", file=sys.stderr)
+        # Fallback content
+        content = f"""
+        <h2>Welcome to AI Generated Content</h2>
+        <p>An error occurred while generating content. This is fallback content.</p>
+        <p>Error details: {str(e)}</p>
+        <h3>About This Page</h3>
+        <p>This page is automatically generated using GitHub Actions and AI APIs.</p>
+        """
     
     # Create HTML from template
     template = Template(create_html_template())
@@ -267,7 +341,9 @@ def main():
         title=page_title,
         content=content,
         date=datetime.now().strftime('%B %d, %Y'),
-        timestamp=datetime.now().isoformat()
+        timestamp=datetime.now().isoformat(),
+        provider=ai_provider,
+        provider_name=provider_name
     )
     
     # Save HTML file
@@ -280,7 +356,9 @@ def main():
         title="404 - Page Not Found",
         content="<h2>Page Not Found</h2><p>The page you're looking for doesn't exist.</p><p><a href='/'>Return to Home</a></p>",
         date=datetime.now().strftime('%B %d, %Y'),
-        timestamp=datetime.now().isoformat()
+        timestamp=datetime.now().isoformat(),
+        provider=ai_provider,
+        provider_name=provider_name
     )
     (output_dir / '404.html').write_text(error_html)
     
@@ -289,7 +367,8 @@ def main():
         'generated_at': datetime.now().isoformat(),
         'prompt': prompt,
         'title': page_title,
-        'model': 'claude-3-5-sonnet-20241022'
+        'provider': ai_provider,
+        'model': 'gpt-4o' if ai_provider == 'openai' else 'claude-3-5-sonnet-20241022'
     }
     (output_dir / 'metadata.json').write_text(json.dumps(metadata, indent=2))
     

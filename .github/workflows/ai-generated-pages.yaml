@@ -13,6 +13,14 @@ on:
         description: 'Title for the generated page'
         required: false
         default: 'AI Generated Content'
+      ai_provider:
+        description: 'AI provider to use (anthropic or openai)'
+        required: false
+        default: 'anthropic'
+        type: choice
+        options:
+          - anthropic
+          - openai
   schedule:
     - cron: '0 0 * * 1'  # Weekly on Monday at midnight
 
@@ -42,11 +50,13 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install anthropic beautifulsoup4 jinja2 markdown2
+          pip install -r requirements.txt
 
-      - name: Generate HTML content with Claude
+      - name: Generate HTML content with AI
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AI_PROVIDER: ${{ github.event.inputs.ai_provider || 'anthropic' }}
           PROMPT: ${{ github.event.inputs.prompt || 'Generate an engaging HTML page about the latest in technology' }}
           PAGE_TITLE: ${{ github.event.inputs.page_title || 'AI Generated Content' }}
         run: |
