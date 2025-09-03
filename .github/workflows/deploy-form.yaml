@@ -1,0 +1,103 @@
+name: Deploy Workflow Trigger Form
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'form/**'
+      - '.github/workflows/deploy-form.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages-form"
+  cancel-in-progress: false
+
+jobs:
+  deploy-form:
+    environment:
+      name: github-pages-form
+      url: ${{ steps.deployment.outputs.page_url }}form/
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      
+      - name: Prepare form directory
+        run: |
+          # Create a deployment directory
+          mkdir -p _site/form
+          
+          # Copy form files
+          cp -r form/* _site/form/
+          
+          # Create a simple redirect at root if needed
+          cat > _site/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>AI Content Generator</title>
+              <meta charset="utf-8">
+              <style>
+                  body {
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                      max-width: 800px;
+                      margin: 50px auto;
+                      padding: 20px;
+                      text-align: center;
+                  }
+                  h1 { color: #667eea; }
+                  .links {
+                      margin: 30px 0;
+                      display: flex;
+                      justify-content: center;
+                      gap: 20px;
+                  }
+                  .link-card {
+                      padding: 20px 30px;
+                      border: 2px solid #667eea;
+                      border-radius: 10px;
+                      text-decoration: none;
+                      color: #333;
+                      transition: all 0.3s;
+                  }
+                  .link-card:hover {
+                      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      color: white;
+                      transform: translateY(-2px);
+                      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+                  }
+              </style>
+          </head>
+          <body>
+              <h1>🤖 AI Content Generator Hub</h1>
+              <p>Choose your action:</p>
+              <div class="links">
+                  <a href="/form/" class="link-card">
+                      <h3>📝 Generate Content</h3>
+                      <p>Create new AI content</p>
+                  </a>
+                  <a href="/public/" class="link-card">
+                      <h3>📄 View Content</h3>
+                      <p>See generated pages</p>
+                  </a>
+              </div>
+          </body>
+          </html>
+          EOF
+      
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '_site'
+      
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

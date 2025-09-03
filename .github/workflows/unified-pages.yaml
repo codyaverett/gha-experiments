@@ -1,0 +1,265 @@
+name: Deploy Unified GitHub Pages Site
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'form/**'
+      - 'scripts/**'
+      - '.github/workflows/unified-pages.yaml'
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: 'Custom prompt for content generation'
+        required: false
+        default: 'Generate an engaging HTML page about the latest in technology'
+      page_title:
+        description: 'Title for the generated page'
+        required: false
+        default: 'AI Generated Content'
+      ai_provider:
+        description: 'AI provider to use (anthropic or openai)'
+        required: false
+        default: 'anthropic'
+        type: choice
+        options:
+          - anthropic
+          - openai
+  schedule:
+    - cron: '0 0 * * 1'  # Weekly on Monday at midnight
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Generate AI content (if triggered)
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AI_PROVIDER: ${{ github.event.inputs.ai_provider || 'anthropic' }}
+          PROMPT: ${{ github.event.inputs.prompt || 'Generate an engaging HTML page about the latest in technology' }}
+          PAGE_TITLE: ${{ github.event.inputs.page_title || 'AI Generated Content' }}
+        run: |
+          python scripts/generate_content.py
+          
+          # Save generation metadata
+          echo "Content generated at $(date)" > public/last-generated.txt
+          echo "Provider: $AI_PROVIDER" >> public/last-generated.txt
+          echo "Title: $PAGE_TITLE" >> public/last-generated.txt
+
+      - name: Prepare site structure
+        run: |
+          # Create the site directory structure
+          mkdir -p _site
+          
+          # Copy form to site
+          cp -r form _site/
+          
+          # Copy generated content if it exists
+          if [ -d "public" ]; then
+            cp -r public _site/content
+          else
+            # Create placeholder if no content exists yet
+            mkdir -p _site/content
+            cat > _site/content/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>No Content Generated Yet</title>
+              <meta charset="utf-8">
+              <style>
+                  body {
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      min-height: 100vh;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      margin: 0;
+                  }
+                  .message {
+                      background: white;
+                      padding: 3rem;
+                      border-radius: 20px;
+                      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                      text-align: center;
+                      max-width: 500px;
+                  }
+                  h1 { color: #667eea; margin-bottom: 1rem; }
+                  p { color: #666; margin-bottom: 2rem; }
+                  a {
+                      display: inline-block;
+                      padding: 0.75rem 2rem;
+                      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      color: white;
+                      text-decoration: none;
+                      border-radius: 10px;
+                      transition: transform 0.2s;
+                  }
+                  a:hover { transform: translateY(-2px); }
+              </style>
+          </head>
+          <body>
+              <div class="message">
+                  <h1>📄 No Content Yet</h1>
+                  <p>AI-generated content will appear here after the first generation.</p>
+                  <a href="/form/">Generate Content Now →</a>
+              </div>
+          </body>
+          </html>
+          EOF
+          fi
+          
+          # Create main index with navigation
+          cat > _site/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>AI Content Generator Hub</title>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <style>
+                  * {
+                      margin: 0;
+                      padding: 0;
+                      box-sizing: border-box;
+                  }
+                  body {
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      min-height: 100vh;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      padding: 20px;
+                  }
+                  .container {
+                      background: white;
+                      border-radius: 20px;
+                      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                      padding: 3rem;
+                      max-width: 800px;
+                      width: 100%;
+                  }
+                  h1 {
+                      color: #333;
+                      margin-bottom: 1rem;
+                      text-align: center;
+                      font-size: 2.5rem;
+                  }
+                  .subtitle {
+                      text-align: center;
+                      color: #666;
+                      margin-bottom: 3rem;
+                      font-size: 1.1rem;
+                  }
+                  .cards {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                      gap: 2rem;
+                  }
+                  .card {
+                      padding: 2rem;
+                      border: 2px solid #e1e1e1;
+                      border-radius: 15px;
+                      text-decoration: none;
+                      color: #333;
+                      transition: all 0.3s;
+                      text-align: center;
+                  }
+                  .card:hover {
+                      border-color: #667eea;
+                      transform: translateY(-5px);
+                      box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+                  }
+                  .card-icon {
+                      font-size: 3rem;
+                      margin-bottom: 1rem;
+                  }
+                  .card h2 {
+                      color: #667eea;
+                      margin-bottom: 0.5rem;
+                  }
+                  .card p {
+                      color: #666;
+                      font-size: 0.95rem;
+                  }
+                  .status {
+                      margin-top: 2rem;
+                      padding: 1rem;
+                      background: #f8f9fa;
+                      border-radius: 10px;
+                      text-align: center;
+                      font-size: 0.9rem;
+                      color: #666;
+                  }
+                  @media (max-width: 600px) {
+                      h1 { font-size: 2rem; }
+                      .container { padding: 2rem; }
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>🤖 AI Content Generator</h1>
+                  <p class="subtitle">Generate and view AI-powered content using GitHub Actions</p>
+                  
+                  <div class="cards">
+                      <a href="/form/" class="card">
+                          <div class="card-icon">📝</div>
+                          <h2>Generate Content</h2>
+                          <p>Create new AI-generated content using Claude or GPT-4</p>
+                      </a>
+                      
+                      <a href="/content/" class="card">
+                          <div class="card-icon">📄</div>
+                          <h2>View Content</h2>
+                          <p>See the latest AI-generated pages and content</p>
+                      </a>
+                  </div>
+                  
+                  <div class="status">
+                      <strong>How it works:</strong> Use the form to trigger a GitHub Actions workflow that generates content using AI and deploys it here automatically.
+                  </div>
+              </div>
+          </body>
+          </html>
+          EOF
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '_site'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
