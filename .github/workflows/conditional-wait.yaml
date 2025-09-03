@@ -1,0 +1,59 @@
+# Pattern 3: Conditional Job Dependencies
+# .github/workflows/conditional-wait.yml
+name: Conditional Dependencies
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '*/10 * * * *'  # Check every 10 minutes
+  workflow_dispatch:
+
+jobs:
+  check-condition:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+      external_status: ${{ steps.check.outputs.external_status }}
+    steps:
+    - name: Check external condition
+      id: check
+      run: |
+        # Check external API, file, or condition
+        status=$(curl -s https://api.example.com/status | jq -r '.ready')
+        echo "external_status=$status" >> $GITHUB_OUTPUT
+        
+        if [ "$status" = "true" ]; then
+          echo "ready=true" >> $GITHUB_OUTPUT
+        else
+          echo "ready=false" >> $GITHUB_OUTPUT
+          echo "External system not ready, skipping deployment"
+        fi
+
+  # This job only runs when condition is met
+  deploy-when-ready:
+    runs-on: ubuntu-latest
+    needs: check-condition
+    if: needs.check-condition.outputs.ready == 'true'
+    steps:
+    - name: Deploy
+      run: |
+        echo "External system is ready, proceeding with deployment"
+        echo "Status: ${{ needs.check-condition.outputs.external_status }}"
+
+  # This job runs when condition is NOT met
+  schedule-retry:
+    runs-on: ubuntu-latest
+    needs: check-condition
+    if: |
+      needs.check-condition.outputs.ready == 'false' && 
+      github.event_name != 'schedule'
+    steps:
+    - name: Schedule retry
+      uses: actions/github-script@v7
+      with:
+        script: |
+          // You could trigger the workflow again after a delay
+          // or use external scheduling systems
+          console.log('Condition not met, will retry on next schedule');
+

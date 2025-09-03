@@ -1,0 +1,62 @@
+# Pattern 1: Event-Driven Waiting (Recommended)
+# .github/workflows/event-driven-wait.yml
+name: Event-Driven Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_id:
+        description: 'Deployment ID to wait for'
+        required: true
+
+  # This workflow waits for these events
+  deployment_status:
+  check_run:
+    types: [completed]
+  status:
+  pull_request:
+    types: [closed]
+
+jobs:
+  initial-job:
+    runs-on: ubuntu-latest
+    outputs:
+      deployment_id: ${{ steps.create.outputs.deployment_id }}
+      wait_for: ${{ steps.create.outputs.wait_for }}
+    steps:
+    - name: Start deployment
+      id: create
+      run: |
+        echo "deployment_id=dep_$(date +%s)" >> $GITHUB_OUTPUT
+        echo "wait_for=external_approval" >> $GITHUB_OUTPUT
+        echo "Deployment started, waiting for external approval..."
+
+    - name: Create deployment status
+      uses: actions/github-script@v7
+      with:
+        script: |
+          // Create a deployment that other systems can update
+          const deployment = await github.rest.repos.createDeployment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: context.sha,
+            environment: 'production',
+            description: 'Waiting for external approval'
+          });
+          
+          core.setOutput('deployment_id', deployment.data.id);
+
+  # This job only runs when the right event happens
+  continue-after-event:
+    runs-on: ubuntu-latest
+    needs: initial-job
+    if: |
+      github.event_name == 'deployment_status' && 
+      github.event.deployment_status.state == 'success'
+    steps:
+    - name: Continue workflow
+      run: |
+        echo "Deployment approved! Continuing..."
+        echo "Deployment ID: ${{ github.event.deployment.id }}"
+
+

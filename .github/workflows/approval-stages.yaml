@@ -1,0 +1,57 @@
+# .github/workflows/approval-stages.yml
+name: Multi-Stage Approval
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: 'Approval stage'
+        required: true
+        type: choice
+        options:
+          - 'start'
+          - 'dev-approved'
+          - 'qa-approved'
+          - 'prod-approved'
+
+jobs:
+  start-approval-process:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.stage == 'start'
+    steps:
+    - name: Initialize approval process
+      run: |
+        echo "Starting approval process"
+        echo "Next: Dev team approval required"
+
+  dev-approval:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.stage == 'dev-approved'
+    environment: 
+      name: dev-approval
+    steps:
+    - name: Dev approved
+      run: |
+        echo "Dev team approved, proceeding to QA"
+
+  qa-approval:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.stage == 'qa-approved'
+    environment:
+      name: qa-approval
+    steps:
+    - name: QA approved
+      run: |
+        echo "QA approved, ready for production"
+
+  production-deploy:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.stage == 'prod-approved'
+    environment:
+      name: production
+    steps:
+    - name: Deploy to production
+      run: |
+        echo "All approvals received, deploying to production"
+
+
